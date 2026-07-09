@@ -1,0 +1,35 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* {
+  -webkit-user-select: none !important;
+  -moz-user-select: none !important;
+  -ms-user-select: none !important;
+  user-select: none !important;
+  -webkit-touch-callout: none !important;
+  -webkit-tap-highlight-color: transparent !important;
+}
+
+body {
+  background: #0a0a12;
+  color: #ffffff;
+  font-family: 'Rajdhani', sans-serif;
+  overflow: hidden;
+  margin: 0;
+  padding: 0;
+}
+
+::-webkit-scrollbar { display: none; }
+
+.animate-fade-in {
+  animation: slideUp 0.5s ease-out forwards;
+}
+
+.glow-text {
+  text-shadow: 0 0 10px rgba(0, 212, 255, 0.5), 0 0 20px rgba(0, 212, 255, 0.3);
+}
+
+.glow-border {
+  box-shadow: 0 0 15px rgba(0, 212, 255, 0.3);
+}

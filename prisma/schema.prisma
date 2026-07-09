@@ -1,0 +1,119 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String       @id @default(cuid())
+  phone         String       @unique
+  username      String?      @unique
+  password      String
+  balance       Float        @default(0)
+  keys          Int          @default(0)
+  taps          Int          @default(0)
+  maxTaps       Int          @default(500)
+  tapCoins      Int          @default(0)
+  status        UserStatus   @default(BRONZE)
+  isVip         Boolean      @default(false)
+  vipExpiresAt  DateTime?
+  referralCode  String       @unique
+  referredBy    String?
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  deposits      Deposit[]
+  withdraws     Withdraw[]
+  tapHistory    TapHistory[]
+  claimHistory  ClaimHistory[]
+  missions      Mission[]
+
+  @@map("users")
+}
+
+model Deposit {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  amount      Float
+  method      String
+  proofUrl    String?
+  status      Status   @default(PENDING)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("deposits")
+}
+
+model Withdraw {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  amount      Float
+  method      String
+  address     String
+  status      Status   @default(PENDING)
+  fee         Float    @default(0)
+  processedBy String?
+  processedAt DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("withdraws")
+}
+
+model TapHistory {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  tapCount    Int
+  coinsEarned Int
+  keysEarned  Int
+  createdAt   DateTime @default(now())
+
+  @@map("tap_history")
+}
+
+model ClaimHistory {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  amount      Int
+  value       Float
+  status      String   @default("SUCCESS")
+  createdAt   DateTime @default(now())
+
+  @@map("claim_history")
+}
+
+model Mission {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  type        String
+  target      Int
+  progress    Int      @default(0)
+  reward      Int
+  completed   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("missions")
+}
+
+enum UserStatus {
+  BRONZE
+  SILVER
+  GOLD
+  PLATINUM
+  DIAMOND
+}
+
+enum Status {
+  PENDING
+  APPROVED
+  REJECTED
+}
