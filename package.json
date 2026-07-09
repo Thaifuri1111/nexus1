@@ -1,10 +1,11 @@
+
 {
   "name": "nexus-game",
   "version": "2.0.0",
   "private": true,
   "scripts": {
-    "dev": "next dev --turbo",
-    "build": "prisma generate && next build",
+    "dev": "NEXT_DISABLE_SWC=1 next dev",
+    "build": "NEXT_DISABLE_SWC=1 prisma generate && next build",
     "start": "next start",
     "lint": "next lint",
     "db:push": "prisma db push",
