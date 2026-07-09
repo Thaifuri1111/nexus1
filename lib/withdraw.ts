@@ -1,35 +1,46 @@
 import { prisma } from './prisma'
 import { CONFIG } from './config'
 
-export async function canWithdraw(userId: string, amount: number): Promise<{ can: boolean; reason?: string }> {
+export async function requestWithdraw(userId: string, amount: bigint, bankName?: string, bankAccNumber?: string) {
+  if (amount < CONFIG.MIN_WITHDRAW) {
+    throw new Error(`Minimum withdraw is ${CONFIG.MIN_WITHDRAW}`)
+  }
+
   const user = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { balance: true, keys: true, isVip: true }
+    where: { id: userId }
   })
 
-  if (!user) return { can: false, reason: 'User tidak ditemukan' }
+  if (!user) throw new Error('User not found')
+  if (user.coins < amount) throw new Error('Insufficient coins')
 
-  if (user.balance < amount) {
-    return { can: false, reason: `Saldo tidak mencukupi. Saldo: ${formatCurrency(user.balance)}` }
-  }
+  const withdraw = await prisma.withdraw.create({
+    data: {
+      userId,
+      amount,
+      status: 'pending',
+      bankName,
+      bankAccNumber,
+    }
+  })
 
-  const minKeys = user.isVip ? 250 : CONFIG.MIN_WITHDRAW_KEYS
-  if (user.keys < minKeys) {
-    return { can: false, reason: `Kunci tidak mencukupi. Butuh ${minKeys} kunci. (${user.keys}/${minKeys})` }
-  }
+  await prisma.user.update({
+    where: { id: userId },
+    data: { coins: user.coins - amount }
+  })
 
-  if (amount < CONFIG.MIN_WITHDRAW) {
-    return { can: false, reason: `Minimal withdraw Rp ${CONFIG.MIN_WITHDRAW.toLocaleString()}` }
-  }
-
-  return { can: true }
+  return withdraw
 }
 
-function formatCurrency(amount: number): string {
-  return new Intl.NumberFormat('id-ID', {
-    style: 'currency',
-    currency: 'IDR',
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(amount)
+export async function completeWithdraw(withdrawId: string) {
+  const withdraw = await prisma.withdraw.findUnique({
+    where: { id: withdrawId }
+  })
+
+  if (!withdraw) throw new Error('Withdraw not found')
+  if (withdraw.status !== 'pending') throw new Error('Withdraw already processed')
+
+  return prisma.withdraw.update({
+    where: { id: withdrawId },
+    data: { status: 'completed' }
+  })
 }

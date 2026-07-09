@@ -1,104 +1,57 @@
 import { prisma } from './prisma'
-import { CONFIG } from './config'
 
-export function rollKeys(): number {
-  return Math.floor(Math.random() * (CONFIG.MAX_KEYS_PER_ROLL - CONFIG.MIN_KEYS_PER_ROLL + 1)) + CONFIG.MIN_KEYS_PER_ROLL
-}
+const TAP_BASE_AMOUNT = 1n
+const ENERGY_PER_TAP = 1
+const ENERGY_RECOVERY_TIME = 5000 // 5 seconds per 1 energy
 
-export async function canTap(userId: string): Promise<{ can: boolean; reason?: string; remaining?: number }> {
+export async function performTap(userId: string, multiplier: number = 1) {
   const user = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { taps: true, maxTaps: true }
+    where: { id: userId }
   })
 
-  if (!user) return { can: false, reason: 'User tidak ditemukan' }
-  if (user.taps >= user.maxTaps) {
-    return { can: false, reason: `Tap habis! Maks ${user.maxTaps} tap.`, remaining: 0 }
-  }
+  if (!user) throw new Error('User not found')
+  if (user.energy < ENERGY_PER_TAP) throw new Error('Not enough energy')
 
-  return { can: true, remaining: user.maxTaps - user.taps }
-}
+  const tapAmount = TAP_BASE_AMOUNT * BigInt(multiplier)
+  const newCoins = user.coins + tapAmount
+  const newEnergy = user.energy - ENERGY_PER_TAP
 
-export async function processTap(userId: string) {
-  const check = await canTap(userId)
-  if (!check.can) {
-    return { success: false, message: check.reason }
-  }
-
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { taps: true }
-  })
-
-  if (!user) return { success: false, message: 'User tidak ditemukan' }
-
-  const newTapCount = user.taps + 1
-  const isRollTime = newTapCount % CONFIG.TAP_PER_ROLL === 0
-
-  let keys = 0
-  let keyMessage = ''
-
-  if (isRollTime) {
-    keys = rollKeys()
-    keyMessage = `🎉 Roll kunci! Dapat ${keys} kunci!`
-  } else {
-    const tapsUntilRoll = CONFIG.TAP_PER_ROLL - (newTapCount % CONFIG.TAP_PER_ROLL)
-    keyMessage = `📊 ${tapsUntilRoll} tap lagi untuk roll kunci`
-  }
-
-  const updatedUser = await prisma.user.update({
+  const updated = await prisma.user.update({
     where: { id: userId },
     data: {
-      taps: { increment: 1 },
-      tapCoins: { increment: CONFIG.COINS_PER_TAP },
-      keys: { increment: keys },
+      coins: newCoins,
+      energy: newEnergy,
+      taps: user.taps + 1n,
     }
   })
 
-  await prisma.tapHistory.create({
+  // Log the tap
+  await prisma.tapLog.create({
     data: {
       userId,
-      tapCount: 1,
-      coinsEarned: CONFIG.COINS_PER_TAP,
-      keysEarned: keys
+      amount: tapAmount,
     }
   })
 
-  return {
-    success: true,
-    coins: CONFIG.COINS_PER_TAP,
-    keys,
-    totalTaps: updatedUser.taps,
-    remaining: updatedUser.maxTaps - updatedUser.taps,
-    isRoll: isRollTime,
-    keyMessage,
-    message: `+${CONFIG.COINS_PER_TAP} coin${keys > 0 ? `, +${keys} kunci` : ''}`
-  }
+  return updated
 }
 
-export async function getTapStatus(userId: string) {
+export async function recoverEnergy(userId: string) {
   const user = await prisma.user.findUnique({
-    where: { id: userId },
-    select: {
-      taps: true,
-      maxTaps: true,
-      tapCoins: true,
-      keys: true
-    }
+    where: { id: userId }
   })
 
-  if (!user) return null
+  if (!user) throw new Error('User not found')
 
-  const nextRoll = CONFIG.TAP_PER_ROLL - (user.taps % CONFIG.TAP_PER_ROLL)
-
-  return {
-    currentTaps: user.taps,
-    maxTaps: user.maxTaps,
-    remaining: user.maxTaps - user.taps,
-    tapCoins: user.tapCoins,
-    keys: user.keys,
-    progress: (user.taps / user.maxTaps) * 100,
-    tapsUntilRoll: nextRoll === CONFIG.TAP_PER_ROLL ? 0 : nextRoll,
-    tapPerRoll: CONFIG.TAP_PER_ROLL,
+  if (user.energy >= user.maxEnergy) {
+    return user
   }
+
+  // Recover 1 energy per 5 seconds, max is maxEnergy
+  const recovered = Math.min(user.energy + 1, user.maxEnergy)
+
+  return prisma.user.update({
+    where: { id: userId },
+    data: { energy: recovered }
+  })
 }
