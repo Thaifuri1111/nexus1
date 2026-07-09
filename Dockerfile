@@ -2,16 +2,21 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
+# ─── COPY PACKAGE ───
 COPY package*.json ./
 COPY prisma ./prisma/
 
+# ─── INSTALL ───
 RUN npm install
 
-COPY . .
-
+# ─── GENERATE PRISMA ───
 RUN npx prisma generate
+
+# ─── BUILD ───
+COPY . .
 RUN npm run build
 
+# ─── PRODUCTION ───
 FROM node:20-alpine AS runner
 
 WORKDIR /app
