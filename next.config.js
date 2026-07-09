@@ -1,7 +1,8 @@
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  swcMinify: true,
+  swcMinify: false,
   poweredByHeader: false,
   
   images: {
@@ -15,26 +16,6 @@ const nextConfig = {
     } : false,
   },
   
-  async headers() {
-    return [
-      {
-        source: '/(.*)',
-        headers: [
-          { key: 'X-Frame-Options', value: 'SAMEORIGIN' },
-          { key: 'X-Content-Type-Options', value: 'nosniff' },
-          { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
-          { key: 'X-XSS-Protection', value: '1; mode=block' },
-        ],
-      },
-      {
-        source: '/api/(.*)',
-        headers: [
-          { key: 'Cache-Control', value: 'no-store, no-cache, must-revalidate' },
-        ],
-      },
-    ]
-  },
-  
   webpack: (config, { isServer }) => {
     if (!isServer) {
       config.resolve.fallback = {
@@ -44,11 +25,6 @@ const nextConfig = {
       }
     }
     return config
-  },
-  
-  experimental: {
-    typedRoutes: true,
-    serverActions: true,
   },
 }
 
