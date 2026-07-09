@@ -1,29 +1,33 @@
-FROM node:20-alpine AS builder
+FROM node:18-alpine AS builder
 
 WORKDIR /app
 
-# ─── COPY PACKAGE ───
+# Copy package files
 COPY package*.json ./
+COPY .npmrc ./
 COPY prisma ./prisma/
 
-# ─── INSTALL ───
+# Install dependencies
 RUN npm install
 
-# ─── GENERATE PRISMA ───
+# Generate Prisma
 RUN npx prisma generate
 
-# ─── BUILD ───
+# Copy source
 COPY . .
+
+# Build
 RUN npm run build
 
-# ─── PRODUCTION ───
-FROM node:20-alpine AS runner
+# Production stage
+FROM node:18-alpine
 
 WORKDIR /app
 
 COPY --from=builder /app/.next ./.next
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/package*.json ./
+COPY --from=builder /app/.npmrc ./
 COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/node_modules ./node_modules
 
