@@ -1,58 +1,41 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { comparePassword } from '@/lib/bcrypt'
-import { generateToken, setAuthCookie } from '@/lib/auth'
-import { z } from 'zod'
-
-const loginSchema = z.object({
-  phone: z.string().min(10),
-  password: z.string().min(6),
-})
+import { verifyPassword } from '@/lib/bcrypt'
+import { generateToken } from '@/lib/auth'
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json()
-    const validated = loginSchema.parse(body)
+    const { email, password } = await request.json()
 
     const user = await prisma.user.findUnique({
-      where: { phone: validated.phone },
+      where: { email }
     })
 
     if (!user) {
-      return NextResponse.json({ error: 'Nomor HP tidak ditemukan' }, { status: 404 })
+      return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 })
     }
 
-    const isValid = await comparePassword(validated.password, user.password)
-    if (!isValid) {
-      return NextResponse.json({ error: 'Password salah' }, { status: 401 })
+    const passwordValid = await verifyPassword(password, user.password)
+    if (!passwordValid) {
+      return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 })
     }
 
-    const token = await generateToken(user.id)
-    await setAuthCookie(token)
+    const token = await generateToken(user.id, user.isAdmin)
 
-    return NextResponse.json({
-      success: true,
-      token,
-      user: {
-        id: user.id,
-        phone: user.phone,
-        username: user.username,
-        balance: user.balance,
-        keys: user.keys,
-        taps: user.taps,
-        maxTaps: user.maxTaps,
-        tapCoins: user.tapCoins,
-        status: user.status,
-        isVip: user.isVip,
-        referralCode: user.referralCode,
-        role: user.role,
-      }
-    })
+    const response = NextResponse.json(
+      { success: true, user },
+      { status: 200 }
+    )
+
+    if (user.isAdmin) {
+      response.cookies.set('admin_token', token, { httpOnly: true, maxAge: 604800 })
+    } else {
+      response.cookies.set('token', token, { httpOnly: true, maxAge: 604800 })
+    }
+
+    return response
   } catch (error) {
-    if (error instanceof z.ZodError) {
-      return NextResponse.json({ error: error.errors[0].message }, { status: 400 })
-    }
     console.error('Login error:', error)
-    return NextResponse.json({ error: 'Terjadi kesalahan' }, { status: 500 })
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
