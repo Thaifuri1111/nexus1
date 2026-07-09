@@ -14,14 +14,14 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
-    const deposits = await prisma.deposit.findMany({
+    const withdraws = await prisma.withdraw.findMany({
       include: { user: true },
       orderBy: { createdAt: 'desc' }
     })
 
-    return NextResponse.json(deposits)
+    return NextResponse.json(withdraws)
   } catch (error) {
-    console.error('Admin deposits error:', error)
+    console.error('Admin withdraws error:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
@@ -43,32 +43,22 @@ export async function PATCH(request: NextRequest) {
     const id = pathname.split('/').pop()
 
     if (!id) {
-      return NextResponse.json({ error: 'Invalid deposit ID' }, { status: 400 })
+      return NextResponse.json({ error: 'Invalid withdraw ID' }, { status: 400 })
     }
 
-    const deposit = await prisma.deposit.findUnique({ where: { id } })
-    if (!deposit) {
-      return NextResponse.json({ error: 'Deposit not found' }, { status: 404 })
+    const withdraw = await prisma.withdraw.findUnique({ where: { id } })
+    if (!withdraw) {
+      return NextResponse.json({ error: 'Withdraw not found' }, { status: 404 })
     }
 
-    if (status === 'completed') {
-      const user = await prisma.user.findUnique({ where: { id: deposit.userId } })
-      if (user) {
-        await prisma.user.update({
-          where: { id: deposit.userId },
-          data: { coins: user.coins + deposit.amount }
-        })
-      }
-    }
-
-    const updated = await prisma.deposit.update({
+    const updated = await prisma.withdraw.update({
       where: { id },
       data: { status }
     })
 
     return NextResponse.json(updated)
   } catch (error) {
-    console.error('Admin deposit update error:', error)
+    console.error('Admin withdraw update error:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

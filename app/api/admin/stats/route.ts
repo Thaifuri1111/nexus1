@@ -14,24 +14,23 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
-    const users = await prisma.user.findMany({
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        phone: true,
-        coins: true,
-        energy: true,
-        rank: true,
-        isAdmin: true,
-        createdAt: true,
-      },
-      orderBy: { createdAt: 'desc' }
-    })
+    const [totalUsers, totalCoinsResult, pendingDeposits, pendingWithdraws] = await Promise.all([
+      prisma.user.count(),
+      prisma.user.aggregate({ _sum: { coins: true } }),
+      prisma.deposit.count({ where: { status: 'pending' } }),
+      prisma.withdraw.count({ where: { status: 'pending' } }),
+    ])
 
-    return NextResponse.json(users)
+    const totalCoins = totalCoinsResult._sum.coins?.toString() || '0'
+
+    return NextResponse.json({
+      totalUsers,
+      totalCoins,
+      pendingDeposits,
+      pendingWithdraws,
+    })
   } catch (error) {
-    console.error('Admin users error:', error)
+    console.error('Admin stats error:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

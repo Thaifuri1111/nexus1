@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { verifyToken } from '@/lib/auth'
 
+const MIN_WITHDRAW = 10000n
+
 export async function POST(request: NextRequest) {
   try {
     const token = request.cookies.get('token')?.value
@@ -14,6 +16,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 })
     }
 
+    const { amount, bankName, bankAccNumber } = await request.json()
+    const withdrawAmount = BigInt(amount)
+
     const user = await prisma.user.findUnique({
       where: { id: payload.userId }
     })
@@ -22,22 +27,32 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
-    const claimAmount = 1000n
-    const updated = await prisma.user.update({
-      where: { id: payload.userId },
-      data: { coins: user.coins + claimAmount }
-    })
+    if (withdrawAmount < MIN_WITHDRAW) {
+      return NextResponse.json({ error: `Minimum withdraw is ${MIN_WITHDRAW}` }, { status: 400 })
+    }
 
-    await prisma.claim.create({
+    if (user.coins < withdrawAmount) {
+      return NextResponse.json({ error: 'Insufficient coins' }, { status: 400 })
+    }
+
+    const withdraw = await prisma.withdraw.create({
       data: {
         userId: payload.userId,
-        amount: claimAmount,
+        amount: withdrawAmount,
+        bankName,
+        bankAccNumber,
+        status: 'pending',
       }
     })
 
-    return NextResponse.json(updated)
+    await prisma.user.update({
+      where: { id: payload.userId },
+      data: { coins: user.coins - withdrawAmount }
+    })
+
+    return NextResponse.json(withdraw)
   } catch (error) {
-    console.error('Claim error:', error)
+    console.error('Withdraw error:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

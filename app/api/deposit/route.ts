@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { verifyToken } from '@/lib/auth'
 
+const MIN_DEPOSIT = 10000n
+
 export async function POST(request: NextRequest) {
   try {
     const token = request.cookies.get('token')?.value
@@ -14,30 +16,25 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 })
     }
 
-    const user = await prisma.user.findUnique({
-      where: { id: payload.userId }
-    })
+    const { amount, method = 'bank' } = await request.json()
+    const depositAmount = BigInt(amount)
 
-    if (!user) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 })
+    if (depositAmount < MIN_DEPOSIT) {
+      return NextResponse.json({ error: `Minimum deposit is ${MIN_DEPOSIT}` }, { status: 400 })
     }
 
-    const claimAmount = 1000n
-    const updated = await prisma.user.update({
-      where: { id: payload.userId },
-      data: { coins: user.coins + claimAmount }
-    })
-
-    await prisma.claim.create({
+    const deposit = await prisma.deposit.create({
       data: {
         userId: payload.userId,
-        amount: claimAmount,
+        amount: depositAmount,
+        method,
+        status: 'pending',
       }
     })
 
-    return NextResponse.json(updated)
+    return NextResponse.json(deposit)
   } catch (error) {
-    console.error('Claim error:', error)
+    console.error('Deposit error:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

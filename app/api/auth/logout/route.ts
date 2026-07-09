@@ -1,7 +1,8 @@
-import { NextResponse } from 'next/server'
-import { removeAuthCookie } from '@/lib/auth'
+import { NextRequest, NextResponse } from 'next/server'
 
-export async function POST() {
-  await removeAuthCookie()
-  return NextResponse.json({ success: true })
+export async function POST(request: NextRequest) {
+  const response = NextResponse.json({ success: true })
+  response.cookies.delete('token')
+  response.cookies.delete('admin_token')
+  return response
 }
