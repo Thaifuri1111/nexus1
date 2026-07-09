@@ -1,20 +1,15 @@
 'use client'
+
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 
 interface User {
   id: string
-  phone: string
-  username: string
-  balance: number
-  keys: number
-  taps: number
-  maxTaps: number
-  tapCoins: number
-  status: string
-  isVip: boolean
-  referralCode: string
-  role?: string
+  email: string
+  name: string
+  isAdmin: boolean
+  coins: bigint
+  energy: number
 }
 
 export function useAuth() {
@@ -23,33 +18,25 @@ export function useAuth() {
   const router = useRouter()
 
   useEffect(() => {
-    const token = localStorage.getItem('token')
-    if (!token) {
-      setLoading(false)
-      return
+    const fetchUser = async () => {
+      try {
+        const res = await fetch('/api/auth/me')
+        if (!res.ok) {
+          router.push('/login')
+          return
+        }
+        const data = await res.json()
+        setUser(data)
+      } catch (error) {
+        console.error('Auth error:', error)
+        router.push('/login')
+      } finally {
+        setLoading(false)
+      }
     }
 
-    fetch('/api/auth/me')
-      .then(res => res.json())
-      .then(data => {
-        if (data.user) {
-          setUser(data.user)
-        } else {
-          localStorage.removeItem('token')
-        }
-      })
-      .catch(() => {
-        localStorage.removeItem('token')
-      })
-      .finally(() => setLoading(false))
-  }, [])
+    fetchUser()
+  }, [router])
 
-  const logout = async () => {
-    await fetch('/api/auth/logout', { method: 'POST' })
-    localStorage.removeItem('token')
-    setUser(null)
-    router.push('/login')
-  }
-
-  return { user, loading, logout }
+  return { user, loading }
 }
